@@ -163,4 +163,10 @@ python metrics.py --result_folder results/xxx-xxx-xxx
 ### Citation
 
 ```
+@article{cheng2025embodiedeval,
+  title={EmbodiedEval: Evaluate Multimodal LLMs as Embodied Agents},
+  author={Cheng, Zhili and Tu, Yuge and Li, Ran and Dai, Shiqi and Hu, Jinyi and Hu, Shengding and Li, Jiahao and Shi, Yang and Yu, Tianyu and Chen, Weize and others},
+  journal={arXiv preprint arXiv:2501.11858},
+  year={2025}
+}
 ```
