@@ -13,7 +13,7 @@ EmbodiedEval includes a 3D simulator for realtime simulation. You have two optio
 
 Option 1: Run the simulator on your personal computer with a display (Windows/MacOS/Linux). No additional configuration is required. The subsequent installation and data download (approximately 20GB of space) will take place on your computer.
 
-Option 2: Run the simulator on a Linux server, which requires sudo access, up-to-date NVIDIA drivers, and running outside a Docker container. Additional configurations are required as follows:
+[Option 2](#server): Run the simulator on a Linux server, which requires sudo access, up-to-date NVIDIA drivers, and running outside a Docker container. Additional configurations are required as follows:
 
 <details>
   <summary>Additional configurations</summary>
@@ -123,7 +123,7 @@ Run the following code to evaluate your model.
 python run_eval.py --agent myagent
 ```
 
-If your server cannot run the simulator (e.g. without sudo access), and your personal computer cannot run the model. You can run simulation on your computer and the model on the server using the following steps:
+If your server cannot run the simulator (e.g. without sudo access), and your personal computer cannot run the model. You can run simulation on your computer and the model on the server using the [following steps](#Remote):
 <details>
 <summary>Evaluation steps with a remote simulator</summary>
 <br>
