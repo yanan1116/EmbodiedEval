@@ -134,7 +134,7 @@ If your server cannot run the simulator (e.g. without sudo access), and your per
 
 2. On the server, run:
     ```
-    python run_eval.py --agent myagent  --remote --scene_folder <The     absolute path of the scene folder   on your local computer>
+    python run_eval.py --agent myagent  --remote --scene_folder <The absolute path of the scene folder on your local computer>
     ```
     This command will hang, waiting     for the simulator to connect.
 
