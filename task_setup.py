@@ -12,13 +12,12 @@ def process_special_scene(task_info):
     return task_info
 
 
-def get_scene_path(scene_path, scene_folder):
+def get_scene_path(scene_path, scene_folder="data/scenes"):
     """Resolves the scene path based on predefined folder locations."""
     scene_path = scene_path.split("/")[-1]
     for folder in ["AI2THOR", "HSSD", "ObjaverseSynthetic", "Sketchfab"]:
         if os.path.exists(f"{scene_folder}/{folder}/{scene_path}"):
-            scene_path = f"{scene_folder}/{folder}/{scene_path}"
-            return os.path.abspath(scene_path)
+            return f"{folder}/{scene_path}"
 
 def add_human_instances(task_setting, mixamo_path):
     """Adds human instances to the task setting based on human data."""
@@ -58,8 +57,12 @@ def create_task_setting(path, scene_folder):
     task_setting["scene"]["task_instance"] = line
     scene_path = task_info["scene_path"]
     
-    mixamo_path = os.path.abspath(scene_folder + "/Mixamo")
-    scene_path = get_scene_path(scene_path, scene_folder)
+    if scene_folder == "data/scenes":
+        mixamo_path = os.path.abspath("data/scenes/Mixamo")
+        scene_path = os.path.abspath(f"data/scenes/{get_scene_path(scene_path)}")
+    else:
+        mixamo_path = f"{scene_folder}/Mixamo"
+        scene_path = f"{scene_folder}/{get_scene_path(scene_path)}"
     if not scene_path:
         raise FileNotFoundError(f"Scene path not found.")
     if not mixamo_path:
