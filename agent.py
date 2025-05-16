@@ -221,8 +221,8 @@ class AgentLLM(AgentBase):
             
         response_test = self.client.chat.completions.create(
             model = self.model, 
-            messages=[ {"role": "system", "content": "You are a helpful assistant."},
-                        {"role": "user", "content": 'tell me about the history of new york, USA.'} ], 
+            messages=[{"role": "system", "content": "You are a helpful assistant."},
+                        {"role": "user", "content": 'tell me about the history of new york, USA.'}], 
             max_tokens=20, 
             temperature=0
         )
