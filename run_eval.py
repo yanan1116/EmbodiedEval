@@ -2,8 +2,8 @@
 # python run_eval.py --agent random --max_steps 24 --max_images 24 --port 50051 --all
 # python run_eval.py --agent human --max_steps 24 --max_images 24 --port 50051 --all
 
-import os
-import re
+import os,time
+import re,json
 import argparse
 from legent import (Environment, ActionFinish, store_json, load_json, 
                    ResetInfo, save_image, time_string)
@@ -14,6 +14,13 @@ from predicate import build_predicate, get_feedback
 from agent import *
 from task_setup import process_task_settings
 from sys import platform
+import sys,random
+
+import numpy as np
+import matplotlib.pyplot as plt
+
+
+
 
 MAX_STAY_COUNT = 100
 
@@ -36,22 +43,28 @@ def initialize_environment(port, use_video, remote):
     if remote:
         path = None
     return Environment(
-        env_path=path, action_mode=1, camera_resolution_width=448,
-        camera_resolution_height=448, camera_field_of_view=90,
-        run_options={"port": port, "width": 768, "height": 768},
+        env_path=path, action_mode=1, camera_resolution_width=448*2,
+        camera_resolution_height=448*2, camera_field_of_view=90,
+        run_options={"port": port, "width": 768*2, "height": 768*2},
         use_animation=use_video, rendering_options={"use_default_light": 1, "style": 0}
     )
 
-def create_agent(agent_type, sync, env):
-    agents = {
-        "human": lambda: AgentHuman(env),
-        "random": lambda: AgentRandom(env),
-        "gpt-4o": lambda: AgentGPT4o(None if sync else env),
-        "myagent": lambda: MyAgent(None if sync else env)
-    }
-    if agent_type not in agents: 
-        raise ValueError(f"Unsupported agent type: {agent_type}")
-    return agents[agent_type]()
+def create_agent(agent, sync, env):
+    # agents = {
+    #     "human": lambda: AgentHuman(env),
+    #     "random": lambda: AgentRandom(env),
+    #     "gpt-4o": lambda: AgentGPT(None if sync else env, llm_name),
+    #     "myagent": lambda: MyAgent(None if sync else env)
+    # }
+    if agent == 'human':
+        return AgentHuman(env)
+    elif agent == 'random':
+        return AgentRandom(env)
+    elif agent.startswith('gpt-'):
+        return AgentGPT(None if sync else env, agent)
+    else: 
+        raise ValueError(f"Unsupported agent type: {agent}")
+    # return agents[agent_type]()
 
 def load_task_data(scene_folder, run_one_task_instance):
     tasks = load_json("data/tasks/tasks.json")
@@ -113,16 +126,18 @@ def step_environment(env, action, use_video, traj_save_dir, step, frames):
         create_video(frames, f"{traj_save_dir}/{step + 1:04d}.mp4", 30)
     return obs, frames
 
-def evaluate_tasks(agent, max_steps, max_images, port, scene_folder, save_path, 
-                   task_ids, sync, run_one_task_instance, run_all_task_instance, use_video, remote):
+def evaluate_tasks(agent, max_steps, sample_cnt, max_images, port, scene_folder, save_path, 
+                    sync, run_one_task_instance, run_all_task_instance, use_video, remote):
     
     MAX_IMAGE_HISTORY = max_images - 1
     failed_cases, success_cases = [], []
     task_to_type, task_settings = load_task_data(scene_folder, run_one_task_instance)
-    if not task_ids:
-        task_ids = list(range(len(task_settings)))
-   
-    
+    # if not task_ids:
+    task_ids = list(range(len(task_settings)))
+    print('task_ids:', len(task_ids))
+
+    task_ids = random.sample(task_ids, sample_cnt)
+
     env = initialize_environment(port, use_video, remote)
     
     save_path = save_path or f"results/{time_string()}-{agent}-case{task_ids[0]}"
@@ -137,29 +152,45 @@ def evaluate_tasks(agent, max_steps, max_images, port, scene_folder, save_path,
         success_count = 0
         
         for task_i in task_ids:
+            print('task_id:', task_i) # 328
             task_setting = task_settings[task_i]
             obs, step, done, frames, stuck_count, stuck_pos, traj_save_dir = initialize_episode(task_i, task_setting, agent, env, save_path, use_video)
             task_category = task_to_type[task_i]
             pred_list = process_predicates(task_setting, obs, run_one_task_instance, run_all_task_instance)
             options = obs.game_states["option_mode_info"]["options"]
             feedback, prev_obs = None, obs
-            print(options)
             
+
             while step < max_steps:
                 if use_video:
                     agent.frames = frames
+
+                print('\n\nstep===>', step)
+                print('options:', options)
                 action, error, response, thought = execute_action(agent, obs, feedback, options, use_video, traj_save_dir, step)
                 if error:
                     store_json({"step": step, "options": options, "action_choice": action.action_choice, "action_error": error, "action": None, "response": response, "thought": thought, "done_after_action": done, "info_after_action": info, "feedback": feedback, "predicates_done": done_list, "time": time_string()}, f"{traj_save_dir}/{step:04d}a.json")
                     break
 
+                # print("action:", action)
                 obs, frames = step_environment(env, action, use_video, traj_save_dir, step, frames)
                 new_options = obs.game_states["option_mode_info"]["options"]
                 feedback = get_feedback(options[action.action_choice], prev_obs, obs)
                 feedback_content = obs.game_states["option_mode_info"]["feedback_content"]
+
+                # print('obs.game_states:\n', json.dumps(obs.game_states, indent=2))
+
+                # Display the image
+                # plt.imshow(obs.image)
+                # plt.axis('off')  # Hide axis
+                # plt.show()
+                print(f"action: {action.action_choice} ===>{options[action.action_choice]}")
+                print('obs.text:', obs.text)
+                print('feedback:', feedback) 
+                print('feedback_content:', feedback_content)
+
                 prev_obs = obs
                 save_image(obs.image, f"{traj_save_dir}/{step + 1:04d}.png")
-                print(f"step {step}, action: {action.action_choice}. {options[action.action_choice]}, feedback: {feedback} - {feedback_content}\n")
                 feedback = feedback + (f": {feedback_content}" if feedback_content else "")
 
                 done = 1
@@ -184,7 +215,7 @@ def evaluate_tasks(agent, max_steps, max_images, port, scene_folder, save_path,
 
                 store_json({"step": step, "options": options, "action_choice": action.action_choice, "action": options[action.action_choice], "response": response, "thought": thought, "done_after_action": done, "info_after_action": info, "feedback": feedback, "predicates_done": done_list, "time": time_string()}, f"{traj_save_dir}/{step:04d}a.json")
                 options = new_options
-                print(options)
+
                 step += 1
 
                 if step == max_steps - 1 and "QA" in task_category:
@@ -217,6 +248,8 @@ def evaluate_tasks(agent, max_steps, max_images, port, scene_folder, save_path,
             if run_one_task_instance:
                 break
 
+            env.close()
+            # sys.exit()
     except Exception as e:
         print("Exception:", e)
         raise e
@@ -226,9 +259,10 @@ def evaluate_tasks(agent, max_steps, max_images, port, scene_folder, save_path,
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--agent", type=str, default="gpt-4o")
-    parser.add_argument("--test_case_start", type=int, default=-1)
-    parser.add_argument("--test_case_end", type=int, default=328)
-    parser.add_argument("--max_steps", type=int, default=24)
+    # parser.add_argument("--test_case_start", type=int, default=-1)
+    # parser.add_argument("--test_case_end", type=int, default=328)
+    parser.add_argument("--sample_cnt", type=int, default=328)
+    parser.add_argument("--max_steps", type=int, default=100)
     parser.add_argument("--max_images", type=int, default=25)
     parser.add_argument("--port", type=int, default=50051)
     parser.add_argument("--scene_folder", type=str, default="data/scenes") # TODO make it a fixed value
@@ -239,5 +273,5 @@ if __name__ == "__main__":
     parser.add_argument("--use_video", action="store_true")
     parser.add_argument("--remote", action="store_true")
     args = parser.parse_args()
-    task_ids = list(range(args.test_case_start, args.test_case_end)) if args.test_case_start != -1 and args.test_case_end != -1 else None
-    evaluate_tasks(args.agent, args.max_steps, args.max_images, args.port, args.scene_folder, args.save_path, task_ids, args.sync, args.run_one_task_instance, args.all, args.use_video, args.remote)
+    # task_ids = list(range(args.test_case_start, args.test_case_end)) if args.test_case_start != -1 and args.test_case_end != -1 else None
+    evaluate_tasks(args.agent, args.max_steps, args.sample_cnt, args.max_images, args.port, args.scene_folder, args.save_path, args.sync, args.run_one_task_instance, args.all, args.use_video, args.remote)

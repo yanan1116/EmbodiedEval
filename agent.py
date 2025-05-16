@@ -1,12 +1,12 @@
 from typing import List, Tuple, Union
 from legent import Action
-import re
+import re,os,sys
 import queue
 import threading
 import numpy as np
 import re
 from prompts import PROMPT_IMAGE_PREFIX, PROMPT_VIDEO_PREFIX, PROMPT_SUFFIX
-from openai import OpenAI
+from openai import OpenAI,AzureOpenAI
 import requests
 import base64
 import io
@@ -199,14 +199,18 @@ def encode_image(image):
         return base64.b64encode(buffer.getvalue()).decode("utf-8")
 
 
-class AgentGPT4o(AgentBase):
-    def __init__(self, env, model="gpt-4o") -> None:
+class AgentGPT(AgentBase):
+    def __init__(self, env, model) -> None:
         super().__init__(model, env == None, env)
         self.model = model
-        self.api_key = "your api key"
-        self.base_url = "your base url"
-        self.client = OpenAI(api_key=self.api_key, base_url=self.base_url)
-
+        # self.api_key = os.environ['OPENAI_API_KEY']
+        # self.base_url = "your base url"
+        # self.client = OpenAI()
+        self.client = AzureOpenAI(
+            azure_endpoint = os.environ['AZURE_ENDPOINT'],  
+            api_version= "2024-10-01-preview",
+            api_key = os.environ['AZURE_OPENAI_API_KEY'] if self.model in ['gpt-4o-mini'] else os.environ['AZURE_OPENAI_API_KEY_41']
+            )
     def generate(self):
         # Organize the inputs (text and image list) into a payload for ChatGPT.
         messages = [{"role": "user", "content": []}]
@@ -216,26 +220,14 @@ class AgentGPT4o(AgentBase):
             elif type(input) == np.ndarray:
                 messages[0]["content"].append({"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{encode_image(input)}"}})
 
-        def send_request(messages):
-            completion = self.client.chat.completions.create(
-                model="gpt-4o",
-                messages=messages,
-                max_tokens=1024,
-                temperature=0
-            )
-            answer = completion.choices[0].message.content
-            return answer
-
-        for i in range(50):  # Retry up to 50 times in case of network failure
-            try:
-                answer = send_request(messages)
-                break
-            except Exception as e:
-                print("Exception:", e)
-                time.sleep(5)
-        else:
-            raise Exception("Failed to get response from the model.")
-
+        # def send_request(messages):
+        completion = self.client.chat.completions.create(
+            model=self.model,
+            messages=messages,
+            max_tokens=1024,
+            temperature=0
+        )
+        answer = completion.choices[0].message.content.strip()
         return answer
 
 
