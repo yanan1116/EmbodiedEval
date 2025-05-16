@@ -199,18 +199,37 @@ def encode_image(image):
         return base64.b64encode(buffer.getvalue()).decode("utf-8")
 
 
-class AgentGPT(AgentBase):
+class AgentLLM(AgentBase):
     def __init__(self, env, model) -> None:
         super().__init__(model, env == None, env)
         self.model = model
         # self.api_key = os.environ['OPENAI_API_KEY']
         # self.base_url = "your base url"
         # self.client = OpenAI()
-        self.client = AzureOpenAI(
-            azure_endpoint = os.environ['AZURE_ENDPOINT'],  
-            api_version= "2024-10-01-preview",
-            api_key = os.environ['AZURE_OPENAI_API_KEY'] if self.model in ['gpt-4o-mini'] else os.environ['AZURE_OPENAI_API_KEY_41']
-            )
+
+        if self.model.startswith('gpt-'):
+            self.client = AzureOpenAI(
+                azure_endpoint = os.environ['AZURE_ENDPOINT'],  
+                api_version= "2024-10-01-preview",
+                api_key = os.environ['AZURE_OPENAI_API_KEY'] if self.model in ['gpt-4o-mini'] else os.environ['AZURE_OPENAI_API_KEY_41']
+                )
+        else: # call vllm server
+            self.client = OpenAI(
+                    base_url=f"http://10.225.68.29:1703/v1",# localhost
+                    api_key="yyy",
+                )
+            
+        response_test = self.client.chat.completions.create(
+            model = self.model, 
+            messages=[ {"role": "system", "content": "You are a helpful assistant."},
+                        {"role": "user", "content": 'tell me about the history of new york, USA.'} ], 
+            max_tokens=20, 
+            temperature=0
+        )
+        assert response_test.choices[0].message.content.strip(), f'client connection failure:{self.model}'
+
+        
+
     def generate(self):
         # Organize the inputs (text and image list) into a payload for ChatGPT.
         messages = [{"role": "user", "content": []}]

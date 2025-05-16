@@ -60,12 +60,9 @@ def create_agent(agent, sync, env):
         return AgentHuman(env)
     elif agent == 'random':
         return AgentRandom(env)
-    elif agent.startswith('gpt-'):
-        return AgentGPT(None if sync else env, agent)
-    else: 
-        raise ValueError(f"Unsupported agent type: {agent}")
-    # return agents[agent_type]()
-
+    else:
+        return AgentLLM(None, agent)
+    
 def load_task_data(scene_folder, run_one_task_instance):
     tasks = load_json("data/tasks/tasks.json")
     task_to_type = {i: t["task_file"].split("/")[0] for i, t in enumerate(tasks)}
